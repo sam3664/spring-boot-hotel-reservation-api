@@ -57,15 +57,8 @@ public class HotelServiceImp implements HotelService {
      */
     @Override
     public List<Hotel> getHotelPagedList(Integer pageNo, Integer pageSize, String sortBy) {
-
-        Pageable paging = PageRequest.of(pageNo, pageSize, Sort.Direction.ASC, sortBy);
-        Page<Hotel> pagedResult = hotelRepository.findAll(paging);
-
-        if (pagedResult.hasContent()) {
-            return pagedResult.getContent();
-        } else {
-            return new ArrayList<>();
-        }
+        Pageable paging = PageRequest.of(pageNo, pageSize, Sort.by(sortBy).ascending());
+        return hotelRepository.findAll(paging).getContent();
     }
 
     /**
@@ -76,12 +69,8 @@ public class HotelServiceImp implements HotelService {
      */
     @Override
     public Hotel getHotel(Integer id) {
-        validateHotelExistenceById(id);
-        return hotelRepository.findById(id).get();
-
-        // Ot without validateHotelExistenceById(id);
-        // Optional<Hotel> hotel = hotelRepository.findById(id);
-        // return hotel.isPresent() ? hotel.get() : null;
+        return hotelRepository.findById(id)
+                .orElseThrow(() -> new InvalidRequestException(ErrorMessages.INVALID_ID_EXISTENCE));
     }
 
     /**
@@ -93,7 +82,7 @@ public class HotelServiceImp implements HotelService {
      */
     @Override
     public List<Hotel> getAvailable(String dateFrom, String dateTo) {
-        return hotelRepository.findAllBetweenDates(dateFrom, dateTo);
+        return hotelRepository.findAvailableHotels(dateFrom, dateTo);
     }
 
     /**
@@ -104,14 +93,16 @@ public class HotelServiceImp implements HotelService {
      */
     @Override
     public IdEntity saveHotel(@Valid Hotel hotel) {
-        //If dates are empty strings make them null values so that they can be accepted by the database
-        if ((!StringUtils.hasText(hotel.getAvailableFrom())) && (!(StringUtils.hasText(hotel.getAvailableTo())))) {
+        // If dates are empty strings make them null values so that they can be accepted by the database
+        if (!StringUtils.hasText(hotel.getAvailableFrom())) {
             hotel.setAvailableFrom(null);
+        }
+        if (!StringUtils.hasText(hotel.getAvailableTo())) {
             hotel.setAvailableTo(null);
         }
-        hotel = hotelRepository.save(hotel);
+        Hotel savedHotel = hotelRepository.save(hotel);
         IdEntity idEntity = new IdEntity();
-        idEntity.setId(hotel.getId());
+        idEntity.setId(savedHotel.getId());
         return idEntity;
     }
 
@@ -123,14 +114,15 @@ public class HotelServiceImp implements HotelService {
      */
     @Override
     public SuccessEntity deleteHotel(Integer id) {
-        validateHotelExistenceById(id);
-        if (reservationRepository.findAll().stream()
-                .anyMatch(reservations -> reservations.getHotelId().equals(id))) {
+        if (!hotelRepository.existsById(id)) {
+            throw new InvalidRequestException(ErrorMessages.INVALID_ID_EXISTENCE);
+        }
+        if (reservationRepository.existsByHotelId(id)) {
             throw new InvalidRequestException(ErrorMessages.INVALID_HOTEL_DELETE);
         }
-        SuccessEntity successEntity = new SuccessEntity();
         hotelRepository.deleteById(id);
-        successEntity.setSuccess(!hotelRepository.existsById(id));
+        SuccessEntity successEntity = new SuccessEntity();
+        successEntity.setSuccess(true);
         return successEntity;
     }
 
@@ -142,11 +134,13 @@ public class HotelServiceImp implements HotelService {
      */
     @Override
     public SuccessEntity patchHotel(Hotel hotel) {
-        validateHotelExistenceById(hotel.getId());
+        if (!hotelRepository.existsById(hotel.getId())) {
+            throw new InvalidRequestException(ErrorMessages.INVALID_ID_EXISTENCE);
+        }
         doesReservationOverlap(hotel);
+        hotelRepository.save(hotel);
         SuccessEntity successEntity = new SuccessEntity();
-        hotel = hotelRepository.save(hotel);
-        successEntity.setSuccess(hotelRepository.existsById(hotel.getId()));
+        successEntity.setSuccess(true);
         return successEntity;
     }
 
@@ -157,33 +151,19 @@ public class HotelServiceImp implements HotelService {
      */
     @Override
     public void doesReservationOverlap(Hotel hotel) {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        String availTo = hotel.getAvailableTo();
-        String availFrom = hotel.getAvailableFrom();
-        Integer hotelId = hotel.getId();
-        List<Reservation> matchingReservationList = reservationRepository.findAll().stream().filter(reservations -> {
-            if (reservations.getHotelId() == hotelId) {
-                try {
-                    //Checks to see if the user dates are null, if so throw an error as it conflicts with a reservation
-                    if (!StringUtils.hasText(availTo) && !StringUtils.hasText(availFrom)) {
-                        throw new InvalidRequestException(ErrorMessages.INVALID_DATE_CHANGE_NULL);
-                    }
-                    //should return 1 or 0 if there is no overlap, should return -1 if there is an overlap
-                    int checkInBeforeAvailFrom = sdf.parse(reservations.getCheckIn()).compareTo(sdf.parse(availFrom));
-                    //should return -1 or 0 if there is no overlap, should return 1 if there is an overlap
-                    int checkOutBeforeAvailTo = sdf.parse(reservations.getCheckOut()).compareTo(sdf.parse(availTo));
-                    if ((checkInBeforeAvailFrom < 0) || (checkOutBeforeAvailTo > 0)) {
-                        return true;
-                    }
-
-                } catch (ParseException e) {
-                    throw new InvalidRequestException(ErrorMessages.PARSE_ERROR);
-                }
+        if (!StringUtils.hasText(hotel.getAvailableTo()) || !StringUtils.hasText(hotel.getAvailableFrom())) {
+            if (reservationRepository.existsByHotelId(hotel.getId())) {
+                throw new InvalidRequestException(ErrorMessages.INVALID_DATE_CHANGE_NULL);
             }
-            return false;
-        }).toList();
+            return;
+        }
 
-        if (matchingReservationList.size() != 0) {
+        boolean hasOverlap = reservationRepository.findAll().stream()
+                .filter(r -> r.getHotelId().equals(hotel.getId()))
+                .anyMatch(r -> r.getCheckIn().compareTo(hotel.getAvailableFrom()) < 0 
+                            || r.getCheckOut().compareTo(hotel.getAvailableTo()) > 0);
+
+        if (hasOverlap) {
             throw new InvalidRequestException(ErrorMessages.INVALID_HOTEL_UPDATE);
         }
     }
@@ -199,8 +179,7 @@ public class HotelServiceImp implements HotelService {
         if (!hotelRepository.existsById(id)) {
             log.error("Invalid ID: The entered id = {} does not exist.", id);
             throw new InvalidRequestException(ErrorMessages.INVALID_ID_EXISTENCE);
-        } else {
-            return true;
         }
+        return true;
     }
 }
