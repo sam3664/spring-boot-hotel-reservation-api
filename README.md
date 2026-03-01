@@ -29,40 +29,70 @@ This project provides a **RESTful API** for hotel reservations. It enables users
 
 ![image](https://github.com/user-attachments/assets/cb224507-8968-441a-a1d5-600c1271c401)
 
-
-
 | Method | Endpoint | Description |
 | ------ | -------- | ----------- |
 | POST   | `/api/v1/hotel` | Create a new hotel. |
 | PATCH  | `/api/v1/hotel` | Update an existing hotel. |
 | GET    | `/api/v1/hotels` | Retrieve all hotels. |
+| GET    | `/api/v1/hotelPagedList?pageNumber={pageNumber}&pageSize={pageSize}&sortBy={sortBy}` | Retrieve paged list of hotels. |
 | GET    | `/api/v1/hotels/availabilitySearch?dateFrom={from}&dateTo={to}` | Get available hotels for a date range. |
 | GET    | `/api/v1/hotel/{id}` | Retrieve a specific hotel by ID. |
 | DELETE | `/api/v1/hotel/{id}` | Delete a hotel by ID. |
 
-#### Example Request: Create a New Hotel
-**Request Body:**
-```json
-{
-  "name": "Luxury Inn",
-  "type": "LUXURY",
-  "description": "A luxurious hotel in the city center.",
-  "availableFrom": "2025-01-01",
-  "availableTo": "2025-12-31",
-  "status": true
-}
+#### cURL Examples: Hotel APIs
+
+**Create a New Hotel**
+```bash
+curl -X POST http://localhost:8080/api/v1/hotel \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Luxury Inn",
+       "type": "LUXURY",
+       "description": "A luxurious hotel in the city center.",
+       "availableFrom": "2025-01-01",
+       "availableTo": "2025-12-31",
+       "status": true
+     }'
 ```
-**Response:**
-```json
-{
-  "id": 1,
-  "name": "Luxury Inn",
-  "type": "LUXURY",
-  "description": "A luxurious hotel in the city center.",
-  "availableFrom": "2025-01-01",
-  "availableTo": "2025-12-31",
-  "status": true
-}
+
+**Update an Existing Hotel**
+```bash
+curl -X PATCH http://localhost:8080/api/v1/hotel \
+     -H "Content-Type: application/json" \
+     -d '{
+       "id": 1,
+       "name": "Luxury Inn Updated",
+       "type": "LUXURY",
+       "description": "An updated luxurious hotel in the city center.",
+       "availableFrom": "2025-01-01",
+       "availableTo": "2025-12-31",
+       "status": true
+     }'
+```
+
+**Retrieve All Hotels**
+```bash
+curl -X GET http://localhost:8080/api/v1/hotels
+```
+
+**Retrieve Paged List of Hotels**
+```bash
+curl -X GET "http://localhost:8080/api/v1/hotelPagedList?pageNumber=0&pageSize=10&sortBy=id"
+```
+
+**Get Available Hotels for a Date Range**
+```bash
+curl -X GET "http://localhost:8080/api/v1/hotels/availabilitySearch?dateFrom=2025-03-15&dateTo=2025-03-20"
+```
+
+**Retrieve a Specific Hotel by ID**
+```bash
+curl -X GET http://localhost:8080/api/v1/hotel/1
+```
+
+**Delete a Hotel by ID**
+```bash
+curl -X DELETE http://localhost:8080/api/v1/hotel/1
 ```
 
 ---
@@ -71,8 +101,6 @@ This project provides a **RESTful API** for hotel reservations. It enables users
 
 ![image](https://github.com/user-attachments/assets/d51a7e5d-481c-46ed-8bda-a31314e212ff)
 
-
-
 | Method | Endpoint | Description |
 | ------ | -------- | ----------- |
 | POST   | `/api/v1/reservation` | Create a reservation for a hotel. |
@@ -80,27 +108,34 @@ This project provides a **RESTful API** for hotel reservations. It enables users
 | GET    | `/api/v1/reservation/{id}` | Retrieve a reservation by ID. |
 | DELETE | `/api/v1/reservation/{id}` | Delete a reservation by ID. |
 
-#### Example Request: Create a Reservation
-**Request Body:**
-```json
-{
-  "hotelId": 1,
-  "checkIn": "2025-03-15",
-  "checkOut": "2025-03-20",
-  "guests": 2,
-  "status": true
-}
+#### cURL Examples: Reservation APIs
+
+**Create a Reservation**
+```bash
+curl -X POST http://localhost:8080/api/v1/reservation \
+     -H "Content-Type: application/json" \
+     -d '{
+       "hotelId": 1,
+       "checkIn": "2025-03-15",
+       "checkOut": "2025-03-20",
+       "guests": 2,
+       "status": true
+     }'
 ```
-**Response:**
-```json
-{
-  "id": 101,
-  "hotelId": 1,
-  "checkIn": "2025-03-15",
-  "checkOut": "2025-03-20",
-  "guests": 2,
-  "status": true
-}
+
+**Retrieve All Reservations**
+```bash
+curl -X GET http://localhost:8080/api/v1/reservations
+```
+
+**Retrieve a Reservation by ID**
+```bash
+curl -X GET http://localhost:8080/api/v1/reservation/1
+```
+
+**Delete a Reservation by ID**
+```bash
+curl -X DELETE http://localhost:8080/api/v1/reservation/1
 ```
 
 
